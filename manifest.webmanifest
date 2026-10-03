@@ -1,0 +1,16 @@
+{
+  "name": "중고차 꿀매물 분석기",
+  "short_name": "꿀매물",
+  "description": "중고차 매물의 시세·보험이력·성능점검을 분석해 S~F 등급으로 추천",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F8FAFC",
+  "theme_color": "#2563EB",
+  "lang": "ko",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"},
+    {"src": "icon.svg", "sizes": "any", "type": "image/svg+xml"}
+  ]
+}

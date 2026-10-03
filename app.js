@@ -23,7 +23,8 @@ const CFG = {
   weights: { price: 35, history: 30, condition: 25, mileage: 10 },
   price: { min_reg: 15, min_grp: 3, full: 0.15, zero: 0.10, bait: 0.20 },
   history: { small: 1e6, big: 3e6, per_small: 0.07, per_mid: 0.15, per_big: 0.30, per_other: 0.02,
-    per_owner: 0.06, per_plate: 0.04, government: 0.10, rent: 0.30, business: 0.30, no_record: 0.25 },
+    per_owner: 0.06, per_plate: 0.04, government: 0.10, rent: 0.30, business: 0.30, no_record: 0.25,
+    uninsured_cap_months: 3, uninsured_max_grade: 'C' },
   condition: { r1_ex: 0.12, r1_sh: 0.06, r2_ex: 0.20, r2_sh: 0.10, leak: 0.10, issue: 0.05, tuning: 0.05,
     no_insp: 0.35, diag: 0.10, diag_plus: 0.15, ev: 0.05 },
   mileage: { std: 15000, low: 3000 },
@@ -259,6 +260,16 @@ function parseInspection(d) {
     leaks: issues.filter(isLeak).map(([t, s]) => `${t}: ${s}`), issues: issues.filter(x => !isLeak(x)).map(([t, s]) => `${t}: ${s}`),
   };
 }
+function uninsuredMonths(d) {                          // notJoinDate1~5: 'YYYYMM~YYYYMM' 보험 정보제공 불가 기간
+  let total = 0;
+  for (let i = 1; i <= 5; i++) {
+    const [a = '', b = ''] = String(d[`notJoinDate${i}`] || '').split('~').map(s => s.trim().slice(0, 6));
+    if (!/^\d{6}$/.test(a)) continue;
+    const [ey, em] = /^\d{6}$/.test(b) ? [+b.slice(0, 4), +b.slice(4)] : [NOW.getFullYear(), NOW.getMonth() + 1];
+    total += Math.max((ey - +a.slice(0, 4)) * 12 + em - +a.slice(4) + 1, 0);
+  }
+  return total;
+}
 function parseRecord(d) {
   const mine = (d.accidents || []).filter(a => String(a.type) === '2');
   const i = k => parseInt(d[k] || 0, 10);
@@ -268,6 +279,7 @@ function parseRecord(d) {
     other_cnt: i('otherAccidentCnt'), other_cost: i('otherAccidentCost'), owner_changes: i('ownerChangeCnt'),
     plate_changes: i('carNoChangeCnt'), total_loss: i('totalLossCnt'), flood: i('floodTotalLossCnt') + i('floodPartLossCnt'),
     theft: i('robberCnt'), government: i('government'), business: i('business'), rent: i('loan'),
+    uninsured_months: uninsuredMonths(d),
   };
 }
 function parseDiagnosis(d) {
@@ -476,11 +488,17 @@ function mileageScore(car) {
   const s = y <= std ? 1 : clamp(1 - (y - std) / std);
   return [isLow ? Math.min(s, 0.8) : s, isLow];
 }
-function gradeOf(score, hard, bait) {
+function gradeCaps(car) {
+  const caps = car.bait ? [CFG.bait_max] : [];
+  car.uninsured_flag = ((car.record || {}).uninsured_months || 0) >= CFG.history.uninsured_cap_months;
+  if (car.uninsured_flag) caps.push(CFG.history.uninsured_max_grade);
+  return caps;
+}
+function gradeOf(score, hard, caps) {
   const G = CFG.grades;
   if (hard) return G[G.length - 1];
   let i = G.findIndex(x => score >= x.min);
-  if (bait) i = Math.max(i, G.findIndex(x => x.grade === CFG.bait_max));
+  for (const c of caps) i = Math.max(i, G.findIndex(x => x.grade === c));
   return G[i];
 }
 function accidentSummary(car) {
@@ -505,6 +523,7 @@ function explain(car) {
   }
   if (rec) {
     if (rec.my_cnt === 0) pros.push('내차피해 보험처리 없음'); else cons.push(`내차피해 ${rec.my_cnt}건 · ${num(Math.round(rec.my_cost / 1e4))}만원`);
+    if (car.uninsured_flag) cons.push(`보험 정보제공 불가 기간 ${rec.uninsured_months}개월 — 렌트·법인·장기 방치 여부 확인 (등급 상한 적용)`);
     if (rec.owner_changes <= 1) pros.push(`소유자 변경 ${rec.owner_changes}회`); else if (rec.owner_changes >= 3) cons.push(`소유자 변경 ${rec.owner_changes}회`);
     cons.push(...car.history_notes);
   } else cons.push('보험이력 비공개/미확인 — 카히스토리 직접 조회 필요');
@@ -525,7 +544,7 @@ function score(cars) {
     car.s_price = +(p * w.price).toFixed(1); car.s_history = +(h * w.history).toFixed(1);
     car.s_condition = +(c * w.condition).toFixed(1); car.s_mileage = +(m * w.mileage).toFixed(1);
     car.score = +(car.s_price + car.s_history + car.s_condition + car.s_mileage).toFixed(1);
-    const gr = gradeOf(car.score, car.hard.length > 0, car.bait);
+    const gr = gradeOf(car.score, car.hard.length > 0, gradeCaps(car));
     car.grade = gr.grade; car.grade_label = gr.label; car.grade_color = gr.color;
     [car.acc_text, car.acc_kind] = accidentSummary(car);
     Object.assign(car, explain(car));
@@ -635,14 +654,14 @@ function renderResults(cars, cond, ncomps) {
 function downloadCsv() {
   const cols = ['grade', 'score', 's_price', 's_history', 's_condition', 's_mileage', 'id', 'model', 'badge', 'badge_detail', 'year_month',
     'mileage', 'yearly_km', 'price', 'market_price', 'discount_pct', 'market_method', 'market_n', 'flag_bait', 'flag_low_mileage', 'hard_filter',
-    'accident', 'damaged_parts', 'my_claims', 'my_claim_won', 'other_claims', 'owner_changes', 'plate_changes', 'rent', 'business', 'government',
+    'accident', 'damaged_parts', 'my_claims', 'my_claim_won', 'other_claims', 'owner_changes', 'uninsured_months', 'plate_changes', 'rent', 'business', 'government',
     'doc_inspection', 'doc_record', 'doc_diagnosis', 'diag_plus', 'days_listed', 'price_drops', 'signals', 'fuel', 'region', 'url'];
   const rows = state.cars.map(x => {
     const r = x.record || {};
     return {
       ...x, discount_pct: x.discount === null ? '' : (x.discount * 100).toFixed(1), flag_bait: x.bait, flag_low_mileage: x.mileage_low,
       hard_filter: x.hard.join('; '), accident: x.acc_text, damaged_parts: Object.entries(x.damage).map(([k, v]) => `${PARTS[k]}:${STATUS_KO[v.status]}`).join('; '),
-      my_claims: r.my_cnt, my_claim_won: r.my_cost, other_claims: r.other_cnt, owner_changes: r.owner_changes, plate_changes: r.plate_changes,
+      my_claims: r.my_cnt, my_claim_won: r.my_cost, other_claims: r.other_cnt, owner_changes: r.owner_changes, uninsured_months: r.uninsured_months, plate_changes: r.plate_changes,
       rent: r.rent, business: r.business, government: r.government, doc_inspection: docState(x, 'inspection'), doc_record: docState(x, 'record'),
       doc_diagnosis: docState(x, 'diagnosis'), signals: x.signals.join('; '),
     };
@@ -659,9 +678,18 @@ const state = { makers: [], cars: [], running: false };
 function setStatus(msg, kind = '') { const el = $('#status'); el.textContent = msg; el.className = 'status ' + kind; }
 function setProgress(i, n, t0) {
   const pct = n ? Math.round(i / n * 100) : 0, left = i ? Math.round((Date.now() - t0) / i * (n - i) / 1000) : null;
-  $('#bar').style.width = pct + '%';
-  $('#progText').textContent = `${i}/${n}${left !== null ? ` · 남은 시간 약 ${left >= 60 ? Math.round(left / 60) + '분' : left + '초'}` : ''}`;
+  const txt = n ? `상세 조회 ${i}/${n}${left !== null ? ` · 남은 시간 약 ${left >= 60 ? Math.round(left / 60) + '분' : left + '초'}` : ''}` : '매물 목록 수집 중…';
+  $('#bar').style.width = $('#rbBar').style.width = pct + '%';
+  $('#progText').textContent = $('#rbText').textContent = txt;
 }
+
+// 분석 중 화면 꺼짐 방지 (지원 브라우저만)
+const wake = {
+  lock: null,
+  async on() { try { if ('wakeLock' in navigator && !this.lock) { this.lock = await navigator.wakeLock.request('screen'); this.lock.addEventListener('release', () => { this.lock = null; }); } } catch { this.lock = null; } },
+  async off() { try { await this.lock?.release(); } catch { /* 이미 해제됨 */ } this.lock = null; },
+};
+document.addEventListener('visibilitychange', () => { if (state.running && document.visibilityState === 'visible') wake.on(); });
 function fillSelect(sel, items, label) {
   sel.innerHTML = `<option value="">${label}</option>` + items.map((x, i) => `<option value="${i}">${H(x.name)} (${num(x.count)})</option>`).join('');
   sel.disabled = !items.length;
@@ -715,7 +743,8 @@ async function run() {
   let f;
   try { f = readForm(); } catch (e) { setStatus(e.message, 'err'); return; }
   state.running = true; net.cancelled = false; net.stats = { network: 0, cache: 0, errors: 0 };
-  $('#run').textContent = '중단'; $('#prog').classList.remove('hidden'); setProgress(0, 0, Date.now());
+  $('#run').textContent = '중단'; $('#prog').classList.remove('hidden'); $('#runbar').classList.remove('hidden');
+  document.body.classList.add('running'); setProgress(0, 0, Date.now()); wake.on();
   try {
     setStatus('시세 비교용 매물 목록 수집 중…');
     const comps = await search(f.t, f.year);
@@ -732,13 +761,15 @@ async function run() {
     }
     setStatus(`시세 표본 ${num(comps.length)}건 · 상세 조회 ${cands.length}건 (매물당 최대 4회 요청, 1~2초 간격)`);
     const t0 = Date.now(), cars = [];
+    setProgress(0, cands.length, t0);
     for (let i = 0; i < cands.length; i++) { cars.push(await collectVehicle(cands[i])); setProgress(i + 1, cands.length, t0); }
     renderResults(score(analyze(cars, market, f.filters)), f.label, comps.length);
     setStatus(`완료 — 요청 ${net.stats.network} · 캐시 ${net.stats.cache} · 실패 ${net.stats.errors}`, 'ok');
   } catch (e) {
     setStatus(e instanceof Cancelled ? '중단했습니다. 받은 데이터는 브라우저에 저장되어 다시 실행하면 이어서 빠르게 진행됩니다.' : '오류: ' + e.message, 'err');
   } finally {
-    state.running = false; $('#run').textContent = '분석 시작'; $('#prog').classList.add('hidden');
+    state.running = false; $('#run').textContent = '분석 시작'; $('#prog').classList.add('hidden'); $('#runbar').classList.add('hidden');
+    document.body.classList.remove('running'); wake.off();
   }
 }
 
@@ -757,7 +788,8 @@ function initTooltip() {
 async function init() {
   initTooltip();
   $('#yearTo').placeholder = NOW.getFullYear();
-  $('#maker').onchange = onMaker; $('#group').onchange = onGroup; $('#run').onclick = run;
+  $('#maker').onchange = onMaker; $('#group').onchange = onGroup; $('#run').onclick = run; $('#rbStop').onclick = run;
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
   $('#allModels').onclick = () => { const boxes = document.querySelectorAll('#models input'); const on = [...boxes].some(b => !b.checked); boxes.forEach(b => b.checked = on); };
   $('#clearCache').onclick = async () => { await Store.clear(); setStatus('캐시를 비웠습니다.', 'ok'); };
   await Store.open();

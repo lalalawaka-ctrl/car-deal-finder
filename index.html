@@ -2,8 +2,15 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>중고차 꿀매물 분석기</title>
+<meta name="theme-color" content="#2563EB">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="꿀매물">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
 <meta name="description" content="중고차 매물의 시세·보험이력·성능점검을 분석해 S~F 등급으로 추천하는 개인 프로젝트">
 <style>
 :root{--bg:#F8FAFC;--card:#FFFFFF;--text:#0F172A;--muted:#64748B;--line:#E2E8F0;--chip:#F1F5F9;--accent:#2563EB;
@@ -77,7 +84,24 @@ details{margin-top:10px}summary{cursor:pointer;color:var(--muted);font-size:13px
 .warnbox{background:var(--badbg);color:var(--bad);padding:2px 8px;border-radius:6px;font-size:12px;font-weight:700}
 .guide{font-size:13px;color:var(--muted)}.guide table{border-collapse:collapse;margin:6px 0}.guide td,.guide th{border:1px solid var(--line);padding:3px 8px;text-align:left}
 footer{margin-top:40px;font-size:12px;color:var(--muted)}
-@media (max-width:560px){.main{flex-direction:column}.diagram{width:100%}.card{min-height:0}.head{flex-wrap:wrap}}
+#runbar{position:fixed;left:0;right:0;bottom:0;z-index:8;background:var(--card);border-top:1px solid var(--line);box-shadow:0 -4px 16px rgba(0,0,0,.08);
+  padding:10px 16px calc(10px + env(safe-area-inset-bottom));display:flex;gap:12px;align-items:center}
+#runbar .rb-main{flex:1;min-width:0}#runbar .rb-text{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#runbar .track{margin-top:4px}#runbar .btn{flex:none}
+body.running .wrap{padding-bottom:110px}
+@media (max-width:560px){
+  .wrap{padding-top:16px}h1{font-size:21px}
+  .form{grid-template-columns:1fr 1fr}.form label.f:nth-child(-n+2){grid-column:1/-1}
+  .form label.f:nth-child(3),.form label.f:nth-child(4),.form label.f:nth-child(6){grid-column:1/-1}
+  input[type=number],input[type=text],select{font-size:16px}
+  .btn.primary{flex:1;padding:12px}
+  .grid{grid-auto-rows:auto}.card{min-height:0}
+  .body{padding:12px}.gbadge{width:44px;height:44px;font-size:24px}.title{font-size:15px;white-space:normal}
+  .score b{font-size:19px}.main{gap:10px}
+  .diagram{width:92px}.diagram svg{width:92px}.legend{font-size:9px;gap:2px 6px}
+  .notes{font-size:12.5px;overflow:visible}.notes ul{padding-left:16px}
+  .toolbar{gap:6px}.toolbar button,.toolbar select{padding:6px 10px}
+}
 </style>
 </head>
 <body>
@@ -123,8 +147,8 @@ footer{margin-top:40px;font-size:12px;color:var(--muted)}
     <table><tr><th>등급</th><th>점수</th><th>의미</th></tr>
       <tr><td>S</td><td>90~</td><td>즉시 연락 추천</td></tr><tr><td>A</td><td>80~89</td><td>강력 추천</td></tr><tr><td>B</td><td>70~79</td><td>추천</td></tr>
       <tr><td>C</td><td>60~69</td><td>조건부 고려</td></tr><tr><td>D</td><td>50~59</td><td>비추천</td></tr><tr><td>F</td><td>50 미만</td><td>제외 (침수·전손·도난·주요골격 손상은 점수 무관)</td></tr></table>
-    <p>시세보다 20% 이상 싸면 미끼/허위매물 의심으로 최대 C등급. 장기 미판매·가격 인하 이력은 협상 포인트로 표시합니다.
-      매물당 최대 4번 요청하며 1~2초 간격을 두므로 100대 기준 약 10분 걸립니다. 받은 데이터는 내 브라우저에 저장되어 다시 실행하면 빠릅니다.</p>
+    <p>시세보다 20% 이상 싸면 미끼/허위매물 의심으로, 보험 정보제공 불가(미가입) 기간이 합계 3개월 이상이면 렌트·법인 등 이력 확인이 필요해 최대 C등급. 장기 미판매·가격 인하 이력은 협상 포인트로 표시합니다.
+      매물당 최대 4번 요청하며 1~2초 간격을 두므로 100대 기준 약 10분 걸립니다. 받은 데이터는 내 브라우저에 저장되어 다시 실행하면 빠릅니다.<br>휴대폰에서는 분석 중 화면이 자동으로 켜진 상태로 유지됩니다. 다른 앱으로 전환하면 일시정지될 수 있으니 이 화면을 띄워 두세요. 브라우저 메뉴의 "홈 화면에 추가"로 앱처럼 쓸 수 있습니다.</p>
   </details>
 
   <footer>비공식 개인 프로젝트입니다. 매물 데이터는 엔카(encar.com)에 공개된 정보를 사용하며 엔카와 관련이 없습니다.
@@ -134,6 +158,7 @@ footer{margin-top:40px;font-size:12px;color:var(--muted)}
   <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
     <rect width="6" height="6" fill="#7F1D1D"/><line x1="0" y1="0" x2="0" y2="6" stroke="#FCA5A5" stroke-width="2.5"/>
   </pattern></defs></svg>
+<div id="runbar" class="hidden"><div class="rb-main"><div class="rb-text" id="rbText">준비 중…</div><div class="track"><div id="rbBar" style="height:100%;width:0;background:var(--accent);transition:width .3s"></div></div></div><button class="btn" id="rbStop">중단</button></div>
 <div id="tip"></div>
 <script src="app.js"></script>
 </body>
