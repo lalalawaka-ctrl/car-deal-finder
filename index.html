@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>중고차 꿀매물 분석기</title>
+<meta name="description" content="중고차 매물의 시세·보험이력·성능점검을 분석해 S~F 등급으로 추천하는 개인 프로젝트">
+<style>
+:root{--bg:#F8FAFC;--card:#FFFFFF;--text:#0F172A;--muted:#64748B;--line:#E2E8F0;--chip:#F1F5F9;--accent:#2563EB;
+  --ok:#15803D;--okbg:#DCFCE7;--warn:#A16207;--warnbg:#FEF9C3;--bad:#B91C1C;--badbg:#FEE2E2;--none:#64748B;--nonebg:#F1F5F9;
+  --p-normal:#D1D5DB;--p-frame-normal:#9CA3AF;--p-glass:#BFDBFE;--p-stroke:#FFFFFF}
+@media (prefers-color-scheme:dark){:root{--bg:#0B1120;--card:#111827;--text:#E5E7EB;--muted:#94A3B8;--line:#1F2937;--chip:#1F2937;--accent:#60A5FA;
+  --okbg:#14532D;--ok:#86EFAC;--warnbg:#422006;--warn:#FDE047;--badbg:#450A0A;--bad:#FCA5A5;--nonebg:#1F2937;--none:#94A3B8;
+  --p-normal:#374151;--p-frame-normal:#4B5563;--p-glass:#1E3A5F;--p-stroke:#111827}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif}
+.wrap{max-width:1280px;margin:0 auto;padding:24px 16px 60px}
+h1{font-size:24px;margin:0 0 4px}
+h2{font-size:18px}
+.sub{color:var(--muted);font-size:13px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin:16px 0}
+.form{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px 14px}
+.form label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);font-weight:600}
+.pair{display:flex;gap:6px;align-items:center}.pair input{min-width:0}
+input,select,button{font:inherit;color:var(--text)}
+input[type=number],input[type=text],select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.wide{grid-column:1/-1}
+#models{display:flex;flex-wrap:wrap;gap:6px 14px;padding:8px 0}
+.chk{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text);font-weight:400;cursor:pointer}
+.chk small{color:var(--muted)}
+.opts{display:flex;flex-wrap:wrap;gap:8px 18px}
+.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:14px}
+.btn{border:1px solid var(--line);background:var(--card);padding:8px 14px;border-radius:8px;cursor:pointer}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700;padding:10px 22px}
+.linkbtn{background:none;border:none;color:var(--muted);text-decoration:underline;cursor:pointer;font-size:12px}
+.status{font-size:13px;color:var(--muted)}.status.err{color:var(--bad)}.status.ok{color:var(--ok)}
+#prog{margin-top:10px}.track{height:8px;background:var(--chip);border-radius:99px;overflow:hidden}
+#bar{height:100%;width:0;background:var(--accent);transition:width .3s}
+#progText{font-size:12px;color:var(--muted);margin-top:4px}
+details{margin-top:10px}summary{cursor:pointer;color:var(--muted);font-size:13px}
+.summary{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.gchip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:var(--chip);font-weight:600}
+.gchip i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0 18px}
+.toolbar button,.toolbar select{border:1px solid var(--line);background:var(--card);padding:6px 12px;border-radius:8px;cursor:pointer;width:auto}
+.toolbar button.on{background:var(--text);color:var(--bg)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,600px),1fr));grid-auto-rows:1fr;gap:16px}
+.card{position:relative;display:flex;background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;min-height:430px}
+.strip{width:8px;flex:none}
+.body{flex:1;padding:14px 16px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.head{display:flex;gap:12px;align-items:center}.hmain{min-width:0}
+.gbadge{width:52px;height:52px;border-radius:12px;color:#fff;font-size:28px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}
+.title{font-weight:700;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.title a{color:inherit;text-decoration:none}.title a:hover{text-decoration:underline}
+.meta{color:var(--muted);font-size:13px}
+.score{margin-left:auto;text-align:right;flex:none}.score b{font-size:22px}.score small{display:block;color:var(--muted);font-size:11px}
+.row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.b{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:6px;font-size:12px;font-weight:600}
+.b.ok{background:var(--okbg);color:var(--ok)}.b.none,.b.unknown{background:var(--nonebg);color:var(--none)}
+.b.private,.b.outer{background:var(--warnbg);color:var(--warn)}.b.frame,.b.alert{background:var(--badbg);color:var(--bad)}
+.price b{font-size:18px}.disc.up{color:var(--ok)}.disc.down{color:var(--bad)}
+.main{display:flex;gap:14px;flex:1;min-height:0}
+.diagram{flex:none;width:150px;text-align:center}.diagram svg{width:150px;height:auto}
+.legend{display:flex;flex-wrap:wrap;gap:4px 8px;justify-content:center;font-size:10px;color:var(--muted);margin-top:4px}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:3px;vertical-align:-1px}
+.legend i.hatch{background:repeating-linear-gradient(45deg,#7F1D1D 0 3px,#FCA5A5 3px 5px)}
+.notes{flex:1;min-width:0;font-size:13px;overflow:auto}
+.notes ul{margin:0 0 6px;padding-left:18px}.notes h4{margin:4px 0 2px;font-size:12px}
+.pros h4{color:var(--ok)}.cons h4{color:var(--warn)}.nego h4{color:#0891B2}
+.pt{stroke:var(--p-stroke);stroke-width:1.5;fill:var(--p-normal);cursor:help}
+.pt.fr{fill:var(--p-frame-normal)}.pt.sheet{fill:#F97316}.pt.exchange{fill:#EF4444}
+.pt.frame{fill:url(#hatch);stroke:#450A0A;stroke-width:2.5}.pt:hover{opacity:.75}
+.glass{fill:var(--p-glass)}
+#tip{position:fixed;pointer-events:none;background:#0F172A;color:#fff;padding:4px 8px;border-radius:6px;font-size:12px;display:none;z-index:9;white-space:nowrap}
+.hidden{display:none!important}
+.excl{margin-top:28px}
+.warnbox{background:var(--badbg);color:var(--bad);padding:2px 8px;border-radius:6px;font-size:12px;font-weight:700}
+.guide{font-size:13px;color:var(--muted)}.guide table{border-collapse:collapse;margin:6px 0}.guide td,.guide th{border:1px solid var(--line);padding:3px 8px;text-align:left}
+footer{margin-top:40px;font-size:12px;color:var(--muted)}
+@media (max-width:560px){.main{flex-direction:column}.diagram{width:100%}.card{min-height:0}.head{flex-wrap:wrap}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>중고차 꿀매물 분석기</h1>
+  <div class="sub">조건을 고르면 매물의 시세·보험이력·성능점검을 분석해 S~F 등급으로 추천합니다. 모든 처리는 내 브라우저에서 이뤄집니다.</div>
+
+  <div class="panel">
+    <div class="form">
+      <label class="f">제조사<select id="maker"><option>불러오는 중…</option></select></label>
+      <label class="f">모델<select id="group" disabled><option>모델 선택</option></select></label>
+      <label class="f">연식<span class="pair"><input id="yearFrom" type="number" placeholder="2019" min="1990" max="2100"> ~ <input id="yearTo" type="number" min="1990" max="2100"></span></label>
+      <label class="f">가격 (만원)<span class="pair"><input id="priceFrom" type="number" placeholder="0" min="0" step="100"> ~ <input id="priceTo" type="number" placeholder="상한" min="0" step="100"></span></label>
+      <div class="f wide"><label class="f">세부모델 <button type="button" class="linkbtn" id="allModels">전체 선택/해제</button></label><div id="models"><span class="sub">모델을 선택하면 표시됩니다.</span></div></div>
+      <label class="f">최대 주행거리 (km)<input id="maxKm" type="number" placeholder="제한 없음" min="0" step="10000"></label>
+      <label class="f">연료<select id="fuel"><option value="">전체</option><option>가솔린</option><option>디젤</option><option>LPG</option><option>하이브리드</option><option>전기</option></select></label>
+      <label class="f">지역<select id="region"><option value="">전국</option><option>서울</option><option>경기</option><option>인천</option><option>강원</option><option>대전</option><option>세종</option><option>충남</option><option>충북</option><option>부산</option><option>울산</option><option>경남</option><option>대구</option><option>경북</option><option>광주</option><option>전남</option><option>전북</option><option>제주</option></select></label>
+      <div class="f wide opts">
+        <label class="chk"><input type="checkbox" id="noOuter"> 외판 사고 차량도 제외 (무사고만)</label>
+        <label class="chk"><input type="checkbox" id="exRent"> 렌트 이력 제외</label>
+        <label class="chk"><input type="checkbox" id="exBiz"> 영업용 이력 제외</label>
+      </div>
+    </div>
+    <details><summary>고급 설정</summary>
+      <div class="form" style="margin-top:10px">
+        <label class="f">트림 키워드 (공백 구분, 모두 포함)<input id="trim" type="text" placeholder="예: 롱레인지 AWD"></label>
+        <label class="f">제외 키워드 (쉼표 구분)<input id="exclude" type="text" placeholder="예: 영업용, 렌터카"></label>
+        <label class="f">상세 조회 최대 대수<input id="maxCand" type="number" value="100" min="1" max="300"></label>
+      </div>
+    </details>
+    <div class="actions">
+      <button class="btn primary" id="run">분석 시작</button>
+      <span class="status" id="status"></span>
+      <button type="button" class="linkbtn" id="clearCache">캐시 비우기</button>
+    </div>
+    <div id="prog" class="hidden"><div class="track"><div id="bar"></div></div><div id="progText"></div></div>
+  </div>
+
+  <div id="results"></div>
+
+  <details class="panel guide"><summary>점수·등급 기준</summary>
+    <p><b>점수 100점</b> = 가격 적정성 35 (같은 모델·트림·연식·주행 매물로 추정한 시세 대비, 15% 저렴하면 만점) + 이력 30 (보험처리 건수·금액, 소유자 변경, 렌트·영업용) + 상태 25 (성능점검 외판 교환·판금, 누유, 엔카진단 가산) + 주행거리 10 (연 1.5만km 기준)</p>
+    <table><tr><th>등급</th><th>점수</th><th>의미</th></tr>
+      <tr><td>S</td><td>90~</td><td>즉시 연락 추천</td></tr><tr><td>A</td><td>80~89</td><td>강력 추천</td></tr><tr><td>B</td><td>70~79</td><td>추천</td></tr>
+      <tr><td>C</td><td>60~69</td><td>조건부 고려</td></tr><tr><td>D</td><td>50~59</td><td>비추천</td></tr><tr><td>F</td><td>50 미만</td><td>제외 (침수·전손·도난·주요골격 손상은 점수 무관)</td></tr></table>
+    <p>시세보다 20% 이상 싸면 미끼/허위매물 의심으로 최대 C등급. 장기 미판매·가격 인하 이력은 협상 포인트로 표시합니다.
+      매물당 최대 4번 요청하며 1~2초 간격을 두므로 100대 기준 약 10분 걸립니다. 받은 데이터는 내 브라우저에 저장되어 다시 실행하면 빠릅니다.</p>
+  </details>
+
+  <footer>비공식 개인 프로젝트입니다. 매물 데이터는 엔카(encar.com)에 공개된 정보를 사용하며 엔카와 관련이 없습니다.
+    분석 결과는 참고용이며, 구매 전 실차 확인과 서류 대조를 권장합니다.</footer>
+</div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+    <rect width="6" height="6" fill="#7F1D1D"/><line x1="0" y1="0" x2="0" y2="6" stroke="#FCA5A5" stroke-width="2.5"/>
+  </pattern></defs></svg>
+<div id="tip"></div>
+<script src="app.js"></script>
+</body>
+</html>
